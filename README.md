@@ -1,53 +1,52 @@
-# 🦀 RepoEval-Etoile
+# ⭐ RepoEval-Etoile
 
-**RepoEval** (Repository Evaluation) est un outil d'évaluation automatique pour des projets étudiants gérés avec Git, écrit en Rust.
+**RepoEval** est un outil CLI (ligne de commande) écrit en Rust pour automatiser l'évaluation de dépôts Git d'étudiants.
 
-## 🎯 But du Projet
+## 🎯 Objectif du Projet
 
-L'objectif est d'automatiser des tâches répétitives pour un enseignant ou un correcteur. Au lieu d'aller manuellement dans chaque projet étudiant pour cloner le dépôt, compter les commits, lancer des tests, etc., cet outil fait tout en une seule commande.
+L'objectif est d'automatiser les tâches répétitives de correction. Au lieu d'aller manuellement dans chaque projet étudiant pour cloner le dépôt, compter les commits et lancer des tests, cet outil effectue tout le processus en une seule commande.
 
-### Le processus global
+### Le Processus Global
 
 1.  **Entrée** : Prend une liste d'étudiants et de leurs dépôts (via un fichier CSV).
-2.  **Analyse Git** : Analyse l'historique Git de chaque dépôt pour extraire des métriques quantitatives (activité, fréquence des commits...).
-3.  **Exécution** : Lance une série de commandes personnalisables sur chaque projet (tests, linter, `cloc`...).
-4.  **Rapport** : Centralise toutes ces informations dans un fichier CSV final.
+2.  **Analyse Git** : Analyse l'historique Git de chaque dépôt pour extraire des métriques quantitatives (activité, fréquence des commits, etc.).
+3.  **Exécution** : Exécute une série de commandes personnalisables sur chaque projet (tests unitaires, linter, `cloc`, etc.).
+4.  **Rapport** : Centralise toutes ces informations dans un fichier CSV unique.
 
 ---
 
-## 📂 Architecture du Code
+## 📂 Architecture Modulaire
 
-Chaque fichier a une responsabilité unique (principe de séparation des responsabilités).
+Chaque fichier a une responsabilité unique (Principe de séparation des responsabilités).
 
-### `main.rs`  Orchestra
-* **Rôle** : Le point d'entrée.
-* Il ne fait aucun travail de détail, mais appelle les autres modules séquentiellement :
-  1. Parsing des arguments (`cli`)
-  2. Chargement de la config (`config`)
-  3. Analyse Git (`git_stats`)
-  4. Exécution des commandes (`command_exec`)
-  5. Génération du rapport (`report`)
+### `main.rs` : Le Chef d'Orchestre
+Point d'entrée de l'application. Il ne fait aucun travail de détail mais appelle les modules séquentiellement :
+1.  Parsing des arguments via `cli`.
+2.  Chargement de la configuration via `config`.
+3.  Analyse Git via `git_stats`.
+4.  Exécution des commandes via `command_exec`.
+5.  Génération du rapport via `report`.
 
-### `cli.rs` Interface Ligne de Commande
-* **Rôle** : Gère les arguments terminaux (`clap`).
-* Définit les entrées obligatoires (dossiers, fichiers) et optionnelles.
-* Génère automatiquement l'aide (`--help`).
+### `cli.rs` : Interface Ligne de Commande
+Gère les arguments passés au terminal. Utilise la librairie **`clap`** pour :
+* Définir les arguments de manière déclarative.
+* Gérer le parsing automatique.
+* Générer l'aide (`--help`) et les messages d'erreurs.
 
-### `config.rs` Configuration
-* **Rôle** : Lit le fichier `config.toml`.
-* Rend l'outil flexible en permettant de définir quelles commandes lancer sans recompiler le code.
+### `config.rs` : Configuration
+Lit et interprète le fichier `config.toml`. C'est ce module qui rend l'outil flexible en permettant de définir quelles commandes externes exécuter sur les dépôts.
 
-### `git_stats.rs` Analyseur Git
-* **Rôle** : Extrait les métriques des dépôts.
-* Utilise la librairie **`git2`** pour interagir directement avec les objets Git (commits, trees) sans dépendre de l'exécutable git système.
+### `git_stats.rs` : Analyseur Git
+Le cœur de l'analyse.
+* **Bibliothèque utilisée** : `git2` (bindings Rust pour libgit2).
+* **Fonctionnement** : Il ne cherche pas manuellement le dossier `.git`. Il utilise `Repository::open(path)` qui détecte proprement la racine du dépôt.
+* **Métriques** : Nombre de commits, dates, intervalles de temps.
 
-### `command_exec.rs` Exécuteur
-* **Rôle** : Lance les processus externes.
-* Exécute les commandes définies dans la config sur chaque dépôt étudiant et capture `stdout`, `stderr` et le code de sortie.
+### `command_exec.rs` : Exécuteur de Tâches
+Prend les commandes définies dans la config et les exécute dans le contexte de chaque dépôt étudiant. Il capture `stdout`, `stderr` et le code de retour.
 
-### `report.rs` Reporter
-* **Rôle** : Génère le CSV final.
-* Fusionne les données `Student`, les `GitStats` et les `CommandResults`.
+### `report.rs` : Générateur de Rapport
+Rassemble les données `Student`, `GitStats` et `CommandResults` pour produire le CSV final.
 
 ---
 
@@ -55,7 +54,69 @@ Chaque fichier a une responsabilité unique (principe de séparation des respons
 
 ### Commande de base
 
-Le programme utilise **`clap`** pour gérer les arguments.
-
 ```bash
 cargo run -- <root_dir> <input_csv> <output_csv> [--config-path <chemin>]
+````
+
+  * `--` : Sépare les arguments de Cargo de ceux du programme.
+
+### Arguments
+
+| Argument | Type | Description | Exemple |
+| :--- | :--- | :--- | :--- |
+| **`root_dir`** | Requis | Dossier contenant les sous-dossiers des dépôts étudiants. | `depots/` |
+| **`input_csv`** | Requis | Fichier CSV listant les étudiants. | `etudiants.csv` |
+| **`output_csv`** | Requis | Chemin du fichier de rapport à générer. | `rapport.csv` |
+| **`--config-path`** | Optionnel | Chemin vers la config (défaut: `config.toml`). | `-c my_config.toml` |
+
+-----
+
+## 📄 Formats de Données
+
+### 1\. Fichier d'entrée (`input.csv`)
+
+Doit contenir une ligne d'en-tête stricte pour être désérialisé dans la structure `Student`. Le `repo_name` doit correspondre au nom du dossier dans `root_dir`.
+
+```csv
+nom,login,repo_name
+Jean Dupont,jdupont,projet-dupont
+Marie Curie,mcurie,projet-curie
+```
+
+### 2\. Fichier de sortie (`output.csv`)
+
+Le rapport généré contient :
+
+  * Infos étudiant (`nom`, `login`).
+  * Stats Git (`nb_commits`, `first_commit`, `last_commit`, `avg_time_between_commits`...).
+  * **`command_results`** : Une colonne spéciale contenant du **JSON** avec le résultat détaillé des tests/commandes.
+
+Exemple de JSON dans le CSV de sortie :
+
+```json
+[
+  {
+    "name": "run_tests",
+    "status": 0,
+    "stdout": "Tests passed...",
+    "parsed_output": null
+  }
+]
+```
+
+-----
+
+## ⚙️ Détails Techniques
+
+  * **Langage** : Rust 🦀
+  * **Gestion des erreurs** : Utilisation idiomatique de `Result<()>` dans le `main` avec l'opérateur `?` pour propager les erreurs proprement.
+  * **Bibliothèques clés** :
+      * `clap` (CLI)
+      * `git2` (Git)
+      * `serde` / `csv` (Données)
+      * `toml` (Config)
+
+<!-- end list -->
+
+```
+```
